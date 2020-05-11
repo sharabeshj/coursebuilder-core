@@ -86,6 +86,10 @@
             Availability
             <i class="material-icons gcb-sorted-icon gcb-list__icon"></i>
           </th>
+          <th id="admin_email_column" class="gcb-sorted-none">
+            Admin Emails
+            <i class="material-icons gcb-sorted-icon gcb-list__icon"></i>
+          </th>
           <th id="start_date_column" class="gcb-sorted-none">
             Start Date
             <i class="material-icons gcb-sorted-icon gcb-list__icon"></i>
@@ -139,6 +143,12 @@
                href="{{ course.slug }}/dashboard?action=availability">
               {{ course.availability }}
             </a>
+          </td>
+          <td class="gcb-courses-admin-emails">
+              <div style="display: flex; flex-direction: column;">
+                  <input type="text" id="{{ course.name }}" value="">
+                  <button onclick="saveEmail('{{ course.name }}');">Save</button>
+              </div>
           </td>
           <td class="gcb-courses-start-date">
             <a id="start_date_{{ course.namespace_name }}"
@@ -270,4 +280,47 @@
   {% include 'datetime.js' %}
   {% include 'oeditor.js' %}
   cb_global = { bundle_lib_files: {{bundle_lib_files}} };
+  let getxHttp = new XMLHttpRequest();
+  let courses = []
+  // Load all the courses details through the GET request
+  getxHttp.onreadystatechange = function () {
+      if(this.readyState == 4 && this.status == 200) {
+          let data = JSON.parse(getxHttp.responseText.replace(")]}'",""));
+          let payloadData = JSON.parse(data['payload']);
+          let course = courses.find(i => i.title == payloadData["homepage"]["course:title"]);
+          let newCourses = courses.filter(i => i.title !== payloadData["homepage"]["course:title"]);
+          course["homepage"] = payloadData["homepage"];
+          course["xsrf_token"] = data["xsrf_token"];
+          newCourses.push(course);
+          courses = newCourses;
+          document.getElementById(payloadData["homepage"]['course:title']).value = payloadData["homepage"]["course:admin_user_emails"];
+      }
+  };
+  // Store the useful information in the memory
+  {% for course in courses %}
+      let link = "{{ course.link }}".replace("/dashboard", "");
+      courses.push({ link: link, title: '{{ course.name }}' });
+      getxHttp.open("GET", link + "/rest/course/settings?key=%2Fcourse.yaml", true);
+      getxHttp.send();
+  {% endfor %}
+
+  // PUT request sent on saving the data, thus updating the database
+  function saveEmail(course_name) {;
+      let postxHttp = new XMLHttpRequest();
+      let courseData = courses.find(i => i.title == course_name);
+      let data = new FormData();
+      data.append('request', JSON.stringify({
+          key: "/course.yaml",
+          payload: JSON.stringify({
+              homepage : courseData.homepage
+          }),
+          xsrf_token: courseData.xsrf_token
+      }));
+      postxHttp.open('PUT', courseData.link + "/rest/course/settings", true);
+      postxHttp.onreadystatechange = function () {
+          if(this.readyState == 4 && this.status == 200) {
+      }
+      postxHttp.send(data);
+  }
+
 </script>
